@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git pull:*)",
+      "Bash(node:*)",
+      "Bash(npm:*)",
+      "Bash(npx react-native:*)",
+      "Bash(npx @react-native-community/cli:*)",
+      "Bash(mkdir:*)",
+      "Bash(npx tsc:*)",
+      "Bash(del setup*.*)",
+      "Bash(del SETUP*.*)",
+      "Bash(del check.*)",
+      "Bash(del find-studio.*)",
+      "Bash(del run-setup.*)",
+      "Bash(del smart-setup.*)",
+      "Bash(rm:*)",
+      "Bash(cp:*)"
+    ],
+    "deny": [],
+    "ask": [],
+    "defaultMode": "acceptEdits"
+  }
+}

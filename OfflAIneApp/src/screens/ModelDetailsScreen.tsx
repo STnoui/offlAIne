@@ -22,12 +22,12 @@ export const ModelDetailsScreen: React.FC<NavigationProps> = ({ navigation, rout
   const { state, dispatch } = useAppContext();
   const { modelId } = route.params;
   
-  const [model, setModel] = useState<AIModel | null>(null);
+  const [model, setModel] = useState<AIModel | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | undefined>(undefined);
   const [downloadPaused, setDownloadPaused] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | undefined>(undefined);
   const [isDownloaded, setIsDownloaded] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
 
@@ -38,7 +38,7 @@ export const ModelDetailsScreen: React.FC<NavigationProps> = ({ navigation, rout
 
   const loadModelDetails = async () => {
     setLoading(true);
-    setError(null);
+    setError(undefined);
     
     try {
       // First check if model is in app state
@@ -83,7 +83,7 @@ export const ModelDetailsScreen: React.FC<NavigationProps> = ({ navigation, rout
     if (!model || downloading) return;
     
     setDownloading(true);
-    setDownloadProgress(null);
+    setDownloadProgress(undefined);
     
     try {
       const success = await ModelManagementService.downloadModel(
@@ -112,7 +112,7 @@ export const ModelDetailsScreen: React.FC<NavigationProps> = ({ navigation, rout
       Alert.alert('Error', 'Download failed. Please check your storage space and try again.');
     } finally {
       setDownloading(false);
-      setDownloadProgress(null);
+      setDownloadProgress(undefined);
     }
   };
 
@@ -186,7 +186,7 @@ export const ModelDetailsScreen: React.FC<NavigationProps> = ({ navigation, rout
               await ModelManagementService.cancelDownload(model.id);
               setDownloading(false);
               setDownloadPaused(false);
-              setDownloadProgress(null);
+              setDownloadProgress(undefined);
             } catch (error) {
               Alert.alert('Error', 'Failed to cancel download');
             }

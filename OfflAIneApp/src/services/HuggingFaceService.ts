@@ -128,7 +128,7 @@ export class HuggingFaceService {
     });
   }
 
-  async getModelDetails(modelId: string): Promise<AIModel | null> {
+  async getModelDetails(modelId: string): Promise<AIModel | undefined> {
     try {
       const response = await axios.get(`${HUGGINGFACE_API_BASE}/models/${modelId}`, {
         timeout: 5000,
@@ -162,7 +162,7 @@ export class HuggingFaceService {
       };
     } catch (error) {
       console.error(`Failed to fetch model details for ${modelId}:`, error);
-      return null;
+      return undefined;
     }
   }
 
@@ -201,7 +201,7 @@ export class HuggingFaceService {
         curatedModelIds.map(id => this.getModelDetails(id))
       );
 
-      return models.filter((model): model is AIModel => model !== null);
+      return models.filter((model): model is AIModel => model !== undefined);
     } catch (error) {
       console.error('Failed to fetch curated models:', error);
       return [];
@@ -229,7 +229,7 @@ export class HuggingFaceService {
       const models = await Promise.all(
         tierModels[tier].map(id => this.getModelDetails(id))
       );
-      return models.filter((model): model is AIModel => model !== null);
+      return models.filter((model): model is AIModel => model !== undefined);
     } catch (error) {
       console.error(`Failed to fetch ${tier} tier models:`, error);
       return [];

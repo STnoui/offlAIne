@@ -8,6 +8,7 @@ import {
   useTheme, 
   Searchbar,
   Icon,
+  IconButton,
   ActivityIndicator,
   Menu,
   Divider,
@@ -130,11 +131,10 @@ export const LibraryScreen: React.FC<NavigationProps> = ({ navigation }) => {
               visible={menuVisible === model.id}
               onDismiss={() => setMenuVisible(null)}
               anchor={
-                <Button 
-                  mode="text" 
-                  onPress={() => setMenuVisible(model.id)}
+                <IconButton 
                   icon="dots-vertical"
-                  compact
+                  onPress={() => setMenuVisible(model.id)}
+                  size={20}
                 />
               }
             >

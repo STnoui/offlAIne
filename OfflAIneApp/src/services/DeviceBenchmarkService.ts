@@ -321,7 +321,7 @@ export class DeviceBenchmarkService {
     const startTime = Date.now();
     
     for (let i = 0; i < intervals; i++) {
-      await new Promise(resolve => setTimeout(resolve, intervalDuration));
+      await new Promise(resolve => setTimeout(() => resolve(undefined), intervalDuration));
       
       // Perform a quick performance test
       const testScore = await this.performCpuWork(10000);
@@ -484,7 +484,7 @@ export class DeviceBenchmarkService {
       }
 
       // Small delay to show progress
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(() => resolve(undefined), 100));
     }
 
     onProgress?.(100, 'Computing results');

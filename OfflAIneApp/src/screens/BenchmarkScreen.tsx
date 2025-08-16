@@ -210,7 +210,7 @@ export const BenchmarkScreen: React.FC<NavigationProps> = ({ navigation }) => {
                   navigation.navigate('Discover');
                 }}
               >
-                {typeof model === 'string' ? (model.split('/').pop() || model) : model.modelName}
+                {model.modelName}
               </Chip>
             ))}
           </View>

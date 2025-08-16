@@ -174,7 +174,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation, onMo
       const benchmark = await DeviceBenchmarkService.getCachedBenchmark();
       if (benchmark) {
         const recommendations = benchmark.recommendedModels;
-        if (!recommendations.includes(model.id) && model.performanceTier === 'high' && benchmark.performanceTier === 'low') {
+        if (!recommendations.some(rec => rec.modelId === model.id) && model.performanceTier === 'high' && benchmark.performanceTier === 'low') {
           Alert.alert(
             'Performance Warning',
             `This model may not run well on your device. Your device is rated as ${benchmark.performanceTier}-performance. Continue anyway?`,
@@ -226,7 +226,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation, onMo
       }
     } catch (error) {
       console.error('Download error:', error);
-      showMessage(`Download failed: ${error.message}`);
+      showMessage(`Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 

@@ -402,7 +402,7 @@ export class ResourceMonitorService {
     // Analyze trends
     const cpuTrend = this.analyzeTrend(recentHistory.map(h => h.cpuUsage));
     const memoryTrend = this.analyzeTrend(recentHistory.map(h => h.memoryUsage));
-    const batteryTrend = this.analyzeTrend(recentHistory.map(h => h.batteryLevel), true); // Reverse for battery (higher is better)
+    const batteryTrend = this.analyzeBatteryTrend(recentHistory.map(h => h.batteryLevel));
 
     let summary = 'No monitoring data available';
     if (currentMetrics) {
@@ -424,7 +424,7 @@ export class ResourceMonitorService {
     };
   }
 
-  private analyzeTrend(values: number[], reverse: boolean = false): 'increasing' | 'decreasing' | 'stable' {
+  private analyzeTrend(values: number[]): 'increasing' | 'decreasing' | 'stable' {
     if (values.length < 5) return 'stable';
 
     const first = values.slice(0, values.length / 2);
@@ -435,13 +435,26 @@ export class ResourceMonitorService {
 
     const threshold = Math.max(Math.abs(firstAvg) * 0.1, 5); // 10% change or 5 units minimum
 
-    if (reverse) {
-      if (secondAvg > firstAvg + threshold) return 'improving';
-      if (secondAvg < firstAvg - threshold) return 'declining';
-    } else {
-      if (secondAvg > firstAvg + threshold) return 'increasing';
-      if (secondAvg < firstAvg - threshold) return 'decreasing';
-    }
+    if (secondAvg > firstAvg + threshold) return 'increasing';
+    if (secondAvg < firstAvg - threshold) return 'decreasing';
+
+    return 'stable';
+  }
+
+  private analyzeBatteryTrend(values: number[]): 'improving' | 'declining' | 'stable' {
+    if (values.length < 5) return 'stable';
+
+    const first = values.slice(0, values.length / 2);
+    const second = values.slice(values.length / 2);
+
+    const firstAvg = first.reduce((a, b) => a + b, 0) / first.length;
+    const secondAvg = second.reduce((a, b) => a + b, 0) / second.length;
+
+    const threshold = Math.max(Math.abs(firstAvg) * 0.1, 5); // 10% change or 5 units minimum
+
+    // For battery, higher values are better
+    if (secondAvg > firstAvg + threshold) return 'improving';
+    if (secondAvg < firstAvg - threshold) return 'declining';
 
     return 'stable';
   }

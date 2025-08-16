@@ -119,7 +119,7 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
             <List.Item
               title="Theme"
               description={`Current: ${state.settings.theme}`}
-              left={props => <Icon {...props} source="palette" />}
+              left={props => <Icon {...props} source="palette" size={24} />}
               right={() => (
                 <View style={styles.settingValue}>
                   <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
@@ -134,7 +134,7 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
             <List.Item
               title="Show Resource Monitor"
               description="Display real-time performance metrics"
-              left={props => <Icon {...props} source="chart-line" />}
+              left={props => <Icon {...props} source="chart-line" size={24} />}
               right={() => (
                 <Switch
                   value={state.settings.showResourceMonitor}
@@ -148,7 +148,7 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
             <List.Item
               title="Performance Warnings"
               description="Show alerts when device is under stress"
-              left={props => <Icon {...props} source="alert-circle" />}
+              left={props => <Icon {...props} source="alert-circle" size={24} />}
               right={() => (
                 <Switch
                   value={state.settings.showPerformanceWarnings}
@@ -169,7 +169,7 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
             <List.Item
               title="Background Downloads"
               description="Allow downloads to continue in background"
-              left={props => <Icon {...props} source="download" />}
+              left={props => <Icon {...props} source="download" size={24} />}
               right={() => (
                 <Switch
                   value={state.settings.enableBackgroundDownloads}
@@ -183,7 +183,7 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
             <List.Item
               title="WiFi Only Downloads"
               description="Only download models when connected to WiFi"
-              left={props => <Icon {...props} source="wifi" />}
+              left={props => <Icon {...props} source="wifi" size={24} />}
               right={() => (
                 <Switch
                   value={state.settings.downloadOnlyOnWifi}
@@ -197,7 +197,7 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
             <List.Item
               title="Max Storage Usage"
               description={`Limit model storage to ${state.settings.maxStorageUsage} GB`}
-              left={props => <Icon {...props} source="harddisk" />}
+              left={props => <Icon {...props} source="harddisk" size={24} />}
               right={() => (
                 <View style={styles.settingValue}>
                   <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
@@ -219,7 +219,7 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
             <List.Item
               title="Auto Cleanup"
               description="Automatically remove old and unused models"
-              left={props => <Icon {...props} source="delete-sweep" />}
+              left={props => <Icon {...props} source="delete-sweep" size={24} />}
               right={() => (
                 <Switch
                   value={state.settings.autoCleanup}
@@ -233,7 +233,7 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
             <List.Item
               title="Optimize Storage"
               description="Compress models and free up space"
-              left={props => <Icon {...props} source="compress" />}
+              left={props => <Icon {...props} source="compress" size={24} />}
               onPress={() => setShowStorageDialog(true)}
             />
             
@@ -242,7 +242,7 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
             <List.Item
               title="Clear Cache"
               description="Remove temporary files and cached data"
-              left={props => <Icon {...props} source="cached" />}
+              left={props => <Icon {...props} source="cached" size={24} />}
               onPress={handleClearCache}
             />
           </Card.Content>
@@ -258,7 +258,7 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
             <List.Item
               title="Usage Analytics"
               description="Help improve the app by sharing anonymous usage data"
-              left={props => <Icon {...props} source="chart-box" />}
+              left={props => <Icon {...props} source="chart-box" size={24} />}
               right={() => (
                 <Switch
                   value={state.settings.enableUsageAnalytics}
@@ -272,7 +272,7 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
             <List.Item
               title="Privacy Policy"
               description="Read our privacy policy and data handling practices"
-              left={props => <Icon {...props} source="shield-account" />}
+              left={props => <Icon {...props} source="shield-account" size={24} />}
               onPress={() => {
                 Alert.alert(
                   'Privacy Policy',
@@ -298,7 +298,7 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
             <List.Item
               title="App Version"
               description="0.0.1 (Development)"
-              left={props => <Icon {...props} source="information" />}
+              left={props => <Icon {...props} source="information" size={24} />}
             />
             
             <Divider style={styles.divider} />
@@ -306,7 +306,7 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
             <List.Item
               title="Run Device Benchmark"
               description="Test device performance and get recommendations"
-              left={props => <Icon {...props} source="speedometer" />}
+              left={props => <Icon {...props} source="speedometer" size={24} />}
               onPress={() => navigation.navigate('Benchmark')}
             />
             
@@ -315,7 +315,7 @@ export const SettingsScreen: React.FC<NavigationProps> = ({ navigation }) => {
             <List.Item
               title="Reset All Settings"
               description="Restore app to default configuration"
-              left={props => <Icon {...props} source="restore" />}
+              left={props => <Icon {...props} source="restore" size={24} />}
               onPress={handleResetSettings}
             />
           </Card.Content>

@@ -118,7 +118,7 @@ export class ModelManagementService {
       
       if (this.downloadStates[model.id]) {
         this.downloadStates[model.id].status = 'failed';
-        this.downloadStates[model.id].error = error.message;
+        this.downloadStates[model.id].error = error instanceof Error ? error.message : 'Unknown error';
         await this.saveDownloadStates();
       }
       
@@ -305,7 +305,7 @@ export class ModelManagementService {
         }
         
         const stat = await RNFS.stat(filePath);
-        const actualSize = parseInt(stat.size);
+        const actualSize = stat.size;
         const expectedSize = file.size;
         
         // Allow 10% variance in file size

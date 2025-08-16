@@ -10,10 +10,12 @@ import {
   Searchbar,
   SegmentedButtons,
   Icon,
-  Badge
+  Badge,
+  ActivityIndicator
 } from 'react-native-paper';
 import { useAppContext } from '../contexts/AppContext';
 import { ModelCategory, PerformanceTier, NavigationProps } from '../types';
+import HuggingFaceService from '../services/HuggingFaceService';
 
 const CATEGORIES: { value: ModelCategory; label: string; icon: string }[] = [
   { value: 'writing-assistant', label: 'Writing', icon: 'pencil' },
@@ -39,6 +41,37 @@ export const DiscoverScreen: React.FC<NavigationProps> = ({ navigation }) => {
   const [selectedCategory, setSelectedCategory] = useState<ModelCategory | 'all'>('all');
   const [selectedTier, setSelectedTier] = useState<PerformanceTier | 'all'>('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Load models from HuggingFace on component mount
+  useEffect(() => {
+    loadModels();
+  }, []);
+
+  const loadModels = async () => {
+    if (state.models.length > 0 && !refreshing) return; // Don't reload if we already have models
+    
+    setLoadingModels(true);
+    setErrorMessage(null);
+    
+    try {
+      // Try to get curated models first, then search for popular models
+      let models = await HuggingFaceService.getCuratedModels();
+      
+      if (models.length === 0) {
+        // Fallback to general search if curated models fail
+        models = await HuggingFaceService.searchModels('', 'all', 20);
+      }
+      
+      dispatch({ type: 'SET_MODELS', payload: models });
+    } catch (error) {
+      console.error('Failed to load models:', error);
+      setErrorMessage('Failed to load models. Check your internet connection.');
+    } finally {
+      setLoadingModels(false);
+    }
+  };
 
   const filteredModels = state.models.filter(model => {
     const matchesSearch = model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -53,16 +86,17 @@ export const DiscoverScreen: React.FC<NavigationProps> = ({ navigation }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    // TODO: Implement model refresh from HuggingFace
-    setTimeout(() => setRefreshing(false), 1000);
+    await loadModels();
+    setRefreshing(false);
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 MB';
-    const k = 1024;
-    const sizes = ['MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  const formatFileSize = (sizeInMB: number): string => {
+    if (sizeInMB === 0) return '0 MB';
+    if (sizeInMB < 1024) {
+      return `${sizeInMB.toFixed(1)} MB`;
+    } else {
+      return `${(sizeInMB / 1024).toFixed(1)} GB`;
+    }
   };
 
   const getTierColor = (tier: PerformanceTier): string => {
@@ -175,6 +209,36 @@ export const DiscoverScreen: React.FC<NavigationProps> = ({ navigation }) => {
           style={styles.searchBar}
         />
       </View>
+
+      {loadingModels && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text variant="bodyMedium" style={[styles.loadingText, { color: theme.colors.onSurfaceVariant }]}>
+            Loading models from HuggingFace...
+          </Text>
+        </View>
+      )}
+
+      {errorMessage && (
+        <Card style={[styles.errorCard, { backgroundColor: theme.colors.errorContainer }]}>
+          <Card.Content>
+            <View style={styles.errorContent}>
+              <Icon source="alert-circle" size={24} color={theme.colors.onErrorContainer} />
+              <Text style={{ color: theme.colors.onErrorContainer, marginLeft: 8 }}>
+                {errorMessage}
+              </Text>
+              <Button 
+                mode="outlined" 
+                onPress={loadModels}
+                style={styles.retryButton}
+                textColor={theme.colors.onErrorContainer}
+              >
+                Retry
+              </Button>
+            </View>
+          </Card.Content>
+        </Card>
+      )}
 
       <ScrollView 
         style={styles.filtersContainer}
@@ -333,5 +397,26 @@ const styles = StyleSheet.create({
   },
   emptySubtitle: {
     textAlign: 'center',
+  },
+  loadingContainer: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  errorCard: {
+    margin: 16,
+    marginBottom: 8,
+  },
+  errorContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  retryButton: {
+    marginLeft: 'auto',
+    marginTop: 8,
   },
 });

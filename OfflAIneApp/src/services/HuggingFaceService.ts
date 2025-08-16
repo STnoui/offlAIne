@@ -167,26 +167,33 @@ export class HuggingFaceService {
   }
 
   async getCuratedModels(): Promise<AIModel[]> {
-    // Curated list of high-quality models for each category
+    // Curated list of latest 2025 models optimized for mobile devices
     const curatedModelIds = [
-      // Writing Assistant
-      'microsoft/DialoGPT-medium',
-      'facebook/blenderbot-400M-distill',
-      'EleutherAI/gpt-neo-1.3B',
+      // Light Tier - Recommended for all devices (Primary recommendation: Gemma 3 270M)
+      'google/gemma-3-270m',
+      'microsoft/phi-4-mini',
       
-      // Code Helper  
-      'microsoft/CodeBERT-base',
-      'codeparrot/codeparrot-small',
-      'huggingface/CodeBERTa-small-v1',
+      // Medium Tier - For medium+ performance devices
+      'google/gemma-3n-4b',
+      'Qwen/Qwen3-7B-Instruct',
+      'microsoft/phi-4-mini-instruct',
       
-      // Language Translation
+      // Heavy Tier - For high-end devices only
+      'google/gemma-3n-8b',
+      'Qwen/Qwen3-14B-Instruct',
+      
+      // Specialized Models (updated versions)
+      'microsoft/BioGPT-Large',
+      'allenai/scibert_scivocab_uncased',
+      
+      // Code Assistant Models (2025 versions)
+      'microsoft/CodeT5-large',
+      'Salesforce/codet5p-770m',
+      
+      // Translation Models (maintained compatibility)
       'Helsinki-NLP/opus-mt-en-de',
       'Helsinki-NLP/opus-mt-en-fr',
       'Helsinki-NLP/opus-mt-en-es',
-      
-      // Specialized
-      'microsoft/BioGPT',
-      'allenai/scibert_scivocab_uncased',
     ];
 
     try {
@@ -199,6 +206,79 @@ export class HuggingFaceService {
       console.error('Failed to fetch curated models:', error);
       return [];
     }
+  }
+
+  async getModelsByTier(tier: 'light' | 'medium' | 'heavy'): Promise<AIModel[]> {
+    const tierModels = {
+      light: [
+        'google/gemma-3-270m',      // Primary recommendation - 270M parameters
+        'microsoft/phi-4-mini',     // 3.8B parameters - efficient reasoning
+      ],
+      medium: [
+        'google/gemma-3n-4b',       // 4B parameters - balanced performance
+        'Qwen/Qwen3-7B-Instruct',   // 7B parameters - advanced capabilities
+        'microsoft/phi-4-mini-instruct', // Instruction-tuned version
+      ],
+      heavy: [
+        'google/gemma-3n-8b',       // 8B parameters - maximum performance
+        'Qwen/Qwen3-14B-Instruct',  // 14B parameters - expert-level tasks
+      ]
+    };
+
+    try {
+      const models = await Promise.all(
+        tierModels[tier].map(id => this.getModelDetails(id))
+      );
+      return models.filter((model): model is AIModel => model !== null);
+    } catch (error) {
+      console.error(`Failed to fetch ${tier} tier models:`, error);
+      return [];
+    }
+  }
+
+  getTierDescription(tier: 'light' | 'medium' | 'heavy'): {
+    title: string;
+    description: string;
+    suitableFor: string[];
+    deviceRequirements: string;
+  } {
+    const descriptions = {
+      light: {
+        title: 'Light Models',
+        description: 'Optimized for efficiency and quick responses. Perfect for everyday tasks with minimal battery impact.',
+        suitableFor: [
+          'Quick Q&A and chat',
+          'Simple text assistance',
+          'Basic reasoning tasks',
+          'Low-end to mid-range devices'
+        ],
+        deviceRequirements: '2GB+ RAM, any modern smartphone'
+      },
+      medium: {
+        title: 'Medium Models',
+        description: 'Balanced performance offering advanced capabilities while maintaining reasonable resource usage.',
+        suitableFor: [
+          'Complex conversations',
+          'Content creation and writing',
+          'Code assistance',
+          'Mid-range to high-end devices'
+        ],
+        deviceRequirements: '4GB+ RAM, modern processor recommended'
+      },
+      heavy: {
+        title: 'Heavy Models',
+        description: 'Maximum performance for expert-level tasks. Best results but requires powerful hardware.',
+        suitableFor: [
+          'Professional writing and analysis',
+          'Complex code generation',
+          'Research and technical tasks',
+          'High-end devices only'
+        ],
+        deviceRequirements: '6GB+ RAM, flagship processor, excellent cooling'
+      }
+    };
+
+    return descriptions[tier];
   }
 
   private async cacheModels(models: AIModel[]): Promise<void> {

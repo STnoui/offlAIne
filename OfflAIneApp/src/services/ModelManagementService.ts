@@ -30,6 +30,7 @@ interface DownloadState {
 export class ModelManagementService {
   private static instance: ModelManagementService;
   private downloadStates: DownloadState = {};
+  private activeDownloads: Map<string, any> = new Map(); // Store active download promises
 
   public static getInstance(): ModelManagementService {
     if (!ModelManagementService.instance) {
@@ -92,8 +93,12 @@ export class ModelManagementService {
 
       await this.saveDownloadStates();
 
-      // Simulate model download (In real implementation, this would download from HuggingFace)
-      const success = await this.simulateModelDownload(model, modelPath, onProgress);
+      // Download model from HuggingFace
+      const downloadPromise = this.downloadModelFromHuggingFace(model, modelPath, onProgress);
+      this.activeDownloads.set(modelId, downloadPromise);
+      
+      const success = await downloadPromise;
+      this.activeDownloads.delete(modelId);
 
       if (success) {
         this.downloadStates[modelId].status = 'completed';
@@ -121,14 +126,13 @@ export class ModelManagementService {
     }
   }
 
-  private async simulateModelDownload(
+  private async downloadModelFromHuggingFace(
     model: AIModel,
     modelPath: string,
     onProgress?: (progress: DownloadProgress) => void
   ): Promise<boolean> {
     const modelId = model.id;
-    const totalSize = model.size * 1024 * 1024;
-    const chunkSize = Math.max(totalSize / 100, 1024 * 1024); // At least 1MB chunks
+    const startTime = Date.now();
     
     try {
       // Create model directory
@@ -139,7 +143,8 @@ export class ModelManagementService {
         model,
         downloadedAt: new Date().toISOString(),
         version: '1.0',
-        format: 'gguf', // Default format
+        format: 'gguf',
+        source: 'huggingface',
       };
       
       await RNFS.writeFile(
@@ -148,44 +153,173 @@ export class ModelManagementService {
         'utf8'
       );
 
-      // Simulate download progress
-      let downloadedSize = 0;
       this.downloadStates[modelId].status = 'downloading';
 
-      while (downloadedSize < totalSize && this.downloadStates[modelId].status === 'downloading') {
-        // Simulate download chunk
-        const currentChunk = Math.min(chunkSize, totalSize - downloadedSize);
-        downloadedSize += currentChunk;
+      // Construct HuggingFace download URLs
+      const baseUrl = `https://huggingface.co/${model.id}/resolve/main`;
+      const modelFiles = await this.getModelFiles(model);
+      
+      let totalDownloaded = 0;
+      const totalSize = model.size * 1024 * 1024; // Convert MB to bytes
+      
+      // Download each model file
+      for (const file of modelFiles) {
+        const fileUrl = `${baseUrl}/${file.filename}`;
+        const filePath = `${modelPath}/${file.filename}`;
+        
+        try {
+          const downloadResult = await this.downloadFileWithProgress(
+            fileUrl,
+            filePath,
+            (bytesDownloaded, fileTotalBytes) => {
+              const currentProgress = ((totalDownloaded + bytesDownloaded) / totalSize) * 100;
+              const elapsed = (Date.now() - startTime) / 1000;
+              const downloadSpeed = (totalDownloaded + bytesDownloaded) / 1024 / 1024 / elapsed;
+              const remainingBytes = totalSize - (totalDownloaded + bytesDownloaded);
+              const estimatedTimeRemaining = remainingBytes / (downloadSpeed * 1024 * 1024);
 
-        const progress = (downloadedSize / totalSize) * 100;
-        const downloadSpeed = chunkSize / 1024 / 1024; // MB/s simulation
-        const remainingBytes = totalSize - downloadedSize;
-        const estimatedTimeRemaining = remainingBytes / (downloadSpeed * 1024 * 1024);
+              // Update internal state
+              this.downloadStates[modelId].progress = currentProgress;
+              this.downloadStates[modelId].downloadedSize = totalDownloaded + bytesDownloaded;
 
-        // Update internal state
-        this.downloadStates[modelId].progress = progress;
-        this.downloadStates[modelId].downloadedSize = downloadedSize;
-
-        // Call progress callback
-        onProgress?.({
-          modelId,
-          progress,
-          downloadSpeed,
-          estimatedTimeRemaining,
-          status: 'downloading',
-        });
-
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 50));
+              // Call progress callback
+              onProgress?.({
+                modelId,
+                progress: currentProgress,
+                downloadSpeed,
+                estimatedTimeRemaining,
+                status: 'downloading',
+              });
+            }
+          );
+          
+          if (!downloadResult) {
+            throw new Error(`Failed to download ${file.filename}`);
+          }
+          
+          totalDownloaded += file.size;
+          
+        } catch (fileError) {
+          console.error(`Failed to download file ${file.filename}:`, fileError);
+          throw fileError;
+        }
       }
 
-      // Create model file (placeholder)
-      const modelFile = `${modelPath}/model.gguf`;
-      await RNFS.writeFile(modelFile, `Model data for ${model.name}`, 'utf8');
+      // Verify download integrity
+      const isValid = await this.verifyModelIntegrity(modelPath, modelFiles);
+      if (!isValid) {
+        throw new Error('Downloaded model failed integrity check');
+      }
+
+      // Final progress update
+      onProgress?.({
+        modelId,
+        progress: 100,
+        downloadSpeed: 0,
+        estimatedTimeRemaining: 0,
+        status: 'completed',
+      });
 
       return true;
+      
     } catch (error) {
-      console.error('Simulation download failed:', error);
+      console.error('HuggingFace download failed:', error);
+      
+      // Cleanup partial download
+      try {
+        const exists = await RNFS.exists(modelPath);
+        if (exists) {
+          await RNFS.unlink(modelPath);
+        }
+      } catch (cleanupError) {
+        console.error('Failed to cleanup partial download:', cleanupError);
+      }
+      
+      return false;
+    }
+  }
+
+  private async getModelFiles(model: AIModel): Promise<{ filename: string; size: number }[]> {
+    try {
+      // For GGUF models, typically look for specific file patterns
+      const commonFiles = [
+        { filename: 'model.gguf', size: model.size * 1024 * 1024 * 0.95 }, // Main model file (~95% of total)
+        { filename: 'tokenizer.json', size: model.size * 1024 * 1024 * 0.03 }, // Tokenizer (~3% of total) 
+        { filename: 'config.json', size: model.size * 1024 * 1024 * 0.02 }, // Config (~2% of total)
+      ];
+      
+      // For quantized models, adjust filename
+      if (model.quantization) {
+        const quantSuffix = model.quantization.replace('_', '-');
+        commonFiles[0].filename = `model-${quantSuffix}.gguf`;
+      }
+      
+      return commonFiles;
+      
+    } catch (error) {
+      console.error('Failed to get model files list:', error);
+      // Fallback to single file
+      return [{ filename: 'model.gguf', size: model.size * 1024 * 1024 }];
+    }
+  }
+
+  private async downloadFileWithProgress(
+    url: string,
+    filePath: string,
+    onProgress: (bytesDownloaded: number, totalBytes: number) => void
+  ): Promise<boolean> {
+    try {
+      // Use RNFS downloadFile with progress tracking
+      const downloadOptions = {
+        fromUrl: url,
+        toFile: filePath,
+        background: true,
+        discretionary: true,
+        progress: (res: any) => {
+          const progress = (res.bytesWritten / res.contentLength) * 100;
+          onProgress(res.bytesWritten, res.contentLength);
+        },
+      };
+
+      const result = await RNFS.downloadFile(downloadOptions).promise;
+      
+      // Check if download was successful
+      return result.statusCode === 200;
+      
+    } catch (error) {
+      console.error('File download failed:', error);
+      return false;
+    }
+  }
+
+  private async verifyModelIntegrity(modelPath: string, expectedFiles: { filename: string; size: number }[]): Promise<boolean> {
+    try {
+      // Check if all expected files exist and have reasonable sizes
+      for (const file of expectedFiles) {
+        const filePath = `${modelPath}/${file.filename}`;
+        const exists = await RNFS.exists(filePath);
+        
+        if (!exists) {
+          console.error(`Missing file: ${file.filename}`);
+          return false;
+        }
+        
+        const stat = await RNFS.stat(filePath);
+        const actualSize = parseInt(stat.size);
+        const expectedSize = file.size;
+        
+        // Allow 10% variance in file size
+        const sizeDifference = Math.abs(actualSize - expectedSize) / expectedSize;
+        if (sizeDifference > 0.1) {
+          console.error(`File size mismatch for ${file.filename}: expected ${expectedSize}, got ${actualSize}`);
+          return false;
+        }
+      }
+      
+      return true;
+      
+    } catch (error) {
+      console.error('Integrity verification failed:', error);
       return false;
     }
   }
@@ -193,20 +327,39 @@ export class ModelManagementService {
   async pauseDownload(modelId: string): Promise<void> {
     if (this.downloadStates[modelId]) {
       this.downloadStates[modelId].status = 'paused';
+      
+      // Cancel active download if it exists
+      const activeDownload = this.activeDownloads.get(modelId);
+      if (activeDownload && activeDownload.stop) {
+        activeDownload.stop();
+      }
+      
       await this.saveDownloadStates();
     }
   }
 
   async resumeDownload(modelId: string): Promise<void> {
-    if (this.downloadStates[modelId]) {
+    if (this.downloadStates[modelId] && this.downloadStates[modelId].status === 'paused') {
+      // Find the original model data to resume download
+      // This would typically involve resuming from where we left off
       this.downloadStates[modelId].status = 'downloading';
       await this.saveDownloadStates();
+      
+      // Note: Full resume implementation would require storing partial download state
+      // and implementing HTTP range requests for resume capability
     }
   }
 
   async cancelDownload(modelId: string): Promise<void> {
     if (this.downloadStates[modelId]) {
       this.downloadStates[modelId].status = 'cancelled';
+      
+      // Cancel active download if it exists
+      const activeDownload = this.activeDownloads.get(modelId);
+      if (activeDownload && activeDownload.stop) {
+        activeDownload.stop();
+      }
+      this.activeDownloads.delete(modelId);
       
       // Clean up partial download
       const modelPath = `${MODELS_DIRECTORY}/${this.sanitizeFileName(modelId)}`;

@@ -1,6 +1,17 @@
 import DeviceInfo from 'react-native-device-info';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DeviceBenchmark, BenchmarkTest, PerformanceTier } from '../types';
+import { Platform } from 'react-native';
+import { 
+  DeviceBenchmark, 
+  BenchmarkTest, 
+  PerformanceTier, 
+  AIAccelerator, 
+  AIBenchmarkResults,
+  QuantizationSupport,
+  ModelRecommendation,
+  ModelTier,
+  PrecisionType
+} from '../types';
 
 const BENCHMARK_CACHE_KEY = 'device_benchmark_cache';
 
@@ -12,6 +23,321 @@ export class DeviceBenchmarkService {
       DeviceBenchmarkService.instance = new DeviceBenchmarkService();
     }
     return DeviceBenchmarkService.instance;
+  }
+
+  // AI Accelerator Detection
+  private async detectAIAccelerator(): Promise<AIAccelerator> {
+    const deviceName = await DeviceInfo.getDeviceName();
+    const brand = await DeviceInfo.getBrand();
+    const model = await DeviceInfo.getModel();
+    
+    // Initialize with defaults
+    let accelerator: AIAccelerator = {
+      type: 'unknown',
+      name: 'Unknown',
+      vendor: 'unknown',
+      supportsInt4: false,
+      supportsInt8: false,
+      supportsFp16: false,
+    };
+
+    if (Platform.OS === 'ios') {
+      // Apple devices with Neural Engine
+      const systemVersion = await DeviceInfo.getSystemVersion();
+      const majorVersion = parseInt(systemVersion.split('.')[0]);
+      
+      if (model.includes('iPhone')) {
+        if (model.includes('15 Pro') || model.includes('15')) {
+          accelerator = {
+            type: 'npu',
+            name: 'Apple Neural Engine (A17 Pro)',
+            vendor: 'apple',
+            topsPerformance: 35.17,
+            supportsInt4: true,
+            supportsInt8: true,
+            supportsFp16: true,
+          };
+        } else if (model.includes('14') || model.includes('13')) {
+          accelerator = {
+            type: 'npu',
+            name: 'Apple Neural Engine (A15/A16)',
+            vendor: 'apple',
+            topsPerformance: 15.8,
+            supportsInt4: true,
+            supportsInt8: true,
+            supportsFp16: true,
+          };
+        }
+      } else if (model.includes('iPad')) {
+        accelerator = {
+          type: 'npu',
+          name: 'Apple Neural Engine (M-series)',
+          vendor: 'apple',
+          topsPerformance: 40.0,
+          supportsInt4: true,
+          supportsInt8: true,
+          supportsFp16: true,
+        };
+      }
+    } else if (Platform.OS === 'android') {
+      // Android device detection
+      if (brand.toLowerCase() === 'google' && model.includes('Pixel')) {
+        // Google Tensor chips
+        if (model.includes('9') || model.includes('10')) {
+          accelerator = {
+            type: 'npu',
+            name: 'Google Tensor G4/G5 TPU',
+            vendor: 'google',
+            topsPerformance: 20.0,
+            supportsInt4: true,
+            supportsInt8: true,
+            supportsFp16: true,
+          };
+        }
+      } else if (deviceName.toLowerCase().includes('snapdragon') || model.toLowerCase().includes('snapdragon')) {
+        // Qualcomm Snapdragon devices
+        accelerator = {
+          type: 'npu',
+          name: 'Qualcomm Hexagon NPU',
+          vendor: 'qualcomm',
+          topsPerformance: 25.0,
+          supportsInt4: true,
+          supportsInt8: true,
+          supportsFp16: true,
+        };
+      } else {
+        // Generic Android GPU
+        accelerator = {
+          type: 'gpu',
+          name: 'Android GPU',
+          vendor: 'unknown',
+          supportsInt4: false,
+          supportsInt8: true,
+          supportsFp16: true,
+        };
+      }
+    }
+
+    return accelerator;
+  }
+
+  // Enhanced AI Benchmarks
+  private async runAIMatrixBenchmark(): Promise<{ ops16x16: number; ops32x32: number; ops64x64: number }> {
+    const results = {
+      ops16x16: 0,
+      ops32x32: 0,
+      ops64x64: 0,
+    };
+
+    // 16x16 matrix multiplication benchmark
+    const start16 = Date.now();
+    const iterations16 = 1000;
+    
+    for (let i = 0; i < iterations16; i++) {
+      await this.performMatrixMultiplication(16);
+    }
+    
+    const duration16 = Date.now() - start16;
+    results.ops16x16 = Math.round((iterations16 * 1000) / duration16);
+
+    // 32x32 matrix multiplication benchmark  
+    const start32 = Date.now();
+    const iterations32 = 200;
+    
+    for (let i = 0; i < iterations32; i++) {
+      await this.performMatrixMultiplication(32);
+    }
+    
+    const duration32 = Date.now() - start32;
+    results.ops32x32 = Math.round((iterations32 * 1000) / duration32);
+
+    // 64x64 matrix multiplication benchmark
+    const start64 = Date.now();
+    const iterations64 = 50;
+    
+    for (let i = 0; i < iterations64; i++) {
+      await this.performMatrixMultiplication(64);
+    }
+    
+    const duration64 = Date.now() - start64;
+    results.ops64x64 = Math.round((iterations64 * 1000) / duration64);
+
+    return results;
+  }
+
+  private async performMatrixMultiplication(size: number): Promise<void> {
+    return new Promise(resolve => {
+      const matA = new Array(size);
+      const matB = new Array(size);
+      const matC = new Array(size);
+      
+      // Initialize matrices
+      for (let i = 0; i < size; i++) {
+        matA[i] = new Array(size).fill(0).map(() => Math.random());
+        matB[i] = new Array(size).fill(0).map(() => Math.random());
+        matC[i] = new Array(size).fill(0);
+      }
+      
+      // Matrix multiplication
+      for (let i = 0; i < size; i++) {
+        for (let j = 0; j < size; j++) {
+          for (let k = 0; k < size; k++) {
+            matC[i][j] += matA[i][k] * matB[k][j];
+          }
+        }
+      }
+      
+      resolve();
+    });
+  }
+
+  private async runAIMemoryBenchmark(): Promise<{ sequentialRead: number; sequentialWrite: number; randomAccess: number }> {
+    const arraySize = 10000000; // 10M elements for AI workload simulation
+    
+    // Sequential read test
+    const readArray = new Float32Array(arraySize);
+    for (let i = 0; i < arraySize; i++) {
+      readArray[i] = Math.random();
+    }
+    
+    const readStart = Date.now();
+    let sum = 0;
+    for (let i = 0; i < arraySize; i++) {
+      sum += readArray[i];
+    }
+    const readDuration = Date.now() - readStart;
+    const sequentialRead = Math.round((arraySize * 4) / 1024 / 1024 / (readDuration / 1000)); // MB/s
+
+    // Sequential write test
+    const writeArray = new Float32Array(arraySize);
+    const writeStart = Date.now();
+    for (let i = 0; i < arraySize; i++) {
+      writeArray[i] = i;
+    }
+    const writeDuration = Date.now() - writeStart;
+    const sequentialWrite = Math.round((arraySize * 4) / 1024 / 1024 / (writeDuration / 1000)); // MB/s
+
+    // Random access test
+    const accessStart = Date.now();
+    for (let i = 0; i < 100000; i++) {
+      const randomIndex = Math.floor(Math.random() * arraySize);
+      const value = readArray[randomIndex];
+    }
+    const accessDuration = Date.now() - accessStart;
+    const randomAccess = Math.round((100000 * 4) / 1024 / 1024 / (accessDuration / 1000)); // MB/s
+
+    return { sequentialRead, sequentialWrite, randomAccess };
+  }
+
+  private async runQuantizationBenchmark(accelerator: AIAccelerator): Promise<QuantizationSupport> {
+    const testSize = 1000;
+    const iterations = 100;
+
+    // FP16 test
+    const fp16Start = Date.now();
+    for (let i = 0; i < iterations; i++) {
+      await this.performQuantizedOperations(testSize, 'fp16');
+    }
+    const fp16Duration = Date.now() - fp16Start;
+    const fp16Performance = Math.round((iterations * 1000) / fp16Duration);
+
+    // INT8 test  
+    const int8Start = Date.now();
+    for (let i = 0; i < iterations; i++) {
+      await this.performQuantizedOperations(testSize, 'int8');
+    }
+    const int8Duration = Date.now() - int8Start;
+    const int8Performance = Math.round((iterations * 1000) / int8Duration);
+
+    // INT4 test (if supported)
+    let int4Performance = 0;
+    if (accelerator.supportsInt4) {
+      const int4Start = Date.now();
+      for (let i = 0; i < iterations; i++) {
+        await this.performQuantizedOperations(testSize, 'int4');
+      }
+      const int4Duration = Date.now() - int4Start;
+      int4Performance = Math.round((iterations * 1000) / int4Duration);
+    }
+
+    // W4A8 test (weights 4-bit, activations 8-bit)
+    let w4a8Performance = 0;
+    if (accelerator.supportsInt4 && accelerator.supportsInt8) {
+      const w4a8Start = Date.now();
+      for (let i = 0; i < iterations; i++) {
+        await this.performQuantizedOperations(testSize, 'w4a8');
+      }
+      const w4a8Duration = Date.now() - w4a8Start;
+      w4a8Performance = Math.round((iterations * 1000) / w4a8Duration);
+    }
+
+    return {
+      fp16: {
+        supported: accelerator.supportsFp16,
+        performance: fp16Performance,
+      },
+      int8: {
+        supported: accelerator.supportsInt8,
+        performance: int8Performance,
+      },
+      int4: {
+        supported: accelerator.supportsInt4,
+        performance: int4Performance,
+      },
+      w4a8: {
+        supported: accelerator.supportsInt4 && accelerator.supportsInt8,
+        performance: w4a8Performance,
+      },
+    };
+  }
+
+  private async performQuantizedOperations(size: number, precision: string): Promise<void> {
+    return new Promise(resolve => {
+      // Simulate quantized operations with different precision levels
+      const scaleFactor = precision === 'fp16' ? 1.0 : 
+                         precision === 'int8' ? 255.0 : 
+                         precision === 'int4' ? 15.0 : 127.0;
+      
+      let sum = 0;
+      for (let i = 0; i < size; i++) {
+        const value = Math.random() * scaleFactor;
+        const quantized = Math.round(value);
+        sum += quantized;
+      }
+      
+      resolve();
+    });
+  }
+
+  private async runThermalBenchmark(): Promise<{ sustainedPerformance: number; throttleOnset: number }> {
+    const testDuration = 5 * 60 * 1000; // 5 minutes
+    const intervalDuration = 10 * 1000; // 10 seconds
+    const intervals = testDuration / intervalDuration;
+    
+    const initialScore = await this.performCpuWork(50000);
+    let currentScore = initialScore;
+    let throttleOnset = testDuration / 1000; // Default to full duration if no throttling
+    
+    const startTime = Date.now();
+    
+    for (let i = 0; i < intervals; i++) {
+      await new Promise(resolve => setTimeout(resolve, intervalDuration));
+      
+      // Perform a quick performance test
+      const testScore = await this.performCpuWork(10000);
+      const performanceRatio = testScore / initialScore;
+      
+      // Detect throttling (performance drops below 80% of initial)
+      if (performanceRatio < 0.8 && throttleOnset === testDuration / 1000) {
+        throttleOnset = (Date.now() - startTime) / 1000;
+      }
+      
+      currentScore = testScore;
+    }
+    
+    const sustainedPerformance = Math.round((currentScore / initialScore) * 100);
+    
+    return { sustainedPerformance, throttleOnset };
   }
 
   async runFullBenchmark(onProgress?: (progress: number, currentTest: string) => void): Promise<DeviceBenchmark> {
@@ -56,21 +382,106 @@ export class DeviceBenchmarkService {
         testType: 'storage',
         isCompleted: false,
       },
+      {
+        id: 'ai_matrix',
+        name: 'AI Matrix Operations',
+        description: 'Matrix multiplication performance (simulates transformer layers)',
+        estimatedDuration: 8,
+        testType: 'ai_matrix',
+        isCompleted: false,
+      },
+      {
+        id: 'ai_memory',
+        name: 'AI Memory Bandwidth',
+        description: 'Large array operations for AI workloads',
+        estimatedDuration: 4,
+        testType: 'ai_memory',
+        isCompleted: false,
+      },
+      {
+        id: 'ai_quantization',
+        name: 'Quantization Support',
+        description: 'Tests different precision levels (FP16, INT8, INT4, W4A8)',
+        estimatedDuration: 6,
+        testType: 'ai_quantization',
+        isCompleted: false,
+      },
+      {
+        id: 'ai_thermal',
+        name: 'Thermal Performance',
+        description: 'Sustained performance under thermal load',
+        estimatedDuration: 30,
+        testType: 'ai_thermal',
+        isCompleted: false,
+      },
     ];
 
     const deviceInfo = await this.getDeviceInfo();
+    const aiAccelerator = await this.detectAIAccelerator();
+    
     let totalScore = 0;
     let completedTests = 0;
+    let aiBenchmarkResults: AIBenchmarkResults = {
+      matrixMultiplication: { ops16x16: 0, ops32x32: 0, ops64x64: 0 },
+      memoryBandwidth: { sequentialRead: 0, sequentialWrite: 0, randomAccess: 0 },
+      quantizationPerformance: {
+        fp16: { supported: false, performance: 0 },
+        int8: { supported: false, performance: 0 },
+        int4: { supported: false, performance: 0 },
+        w4a8: { supported: false, performance: 0 },
+      },
+      thermalThrottling: { sustainedPerformance: 100, throttleOnset: 300 },
+    };
 
     for (let i = 0; i < tests.length; i++) {
       const test = tests[i];
       onProgress?.((i / tests.length) * 100, test.name);
 
-      const score = await this.runIndividualTest(test);
+      let score: number;
+      let details: Record<string, any> = {};
+
+      switch (test.testType) {
+        case 'ai_matrix':
+          const matrixResults = await this.runAIMatrixBenchmark();
+          details = matrixResults;
+          score = (matrixResults.ops16x16 + matrixResults.ops32x32 + matrixResults.ops64x64) / 3;
+          break;
+        case 'ai_memory':
+          const memoryResults = await this.runAIMemoryBenchmark();
+          details = memoryResults;
+          score = (memoryResults.sequentialRead + memoryResults.sequentialWrite + memoryResults.randomAccess) / 3;
+          break;
+        case 'ai_quantization':
+          const quantResults = await this.runQuantizationBenchmark(aiAccelerator);
+          details = quantResults;
+          score = (quantResults.fp16.performance + quantResults.int8.performance + quantResults.int4.performance + quantResults.w4a8.performance) / 4;
+          break;
+        case 'ai_thermal':
+          const thermalResults = await this.runThermalBenchmark();
+          details = thermalResults;
+          score = thermalResults.sustainedPerformance;
+          break;
+        default:
+          score = await this.runIndividualTest(test);
+          break;
+      }
+
       test.score = score;
+      test.details = details;
       test.isCompleted = true;
       totalScore += score;
       completedTests++;
+
+      // Store AI benchmark results
+      if (test.id === 'ai_matrix') {
+        aiBenchmarkResults.matrixMultiplication = details as typeof aiBenchmarkResults.matrixMultiplication;
+      } else if (test.id === 'ai_memory') {
+        aiBenchmarkResults.memoryBandwidth = details as typeof aiBenchmarkResults.memoryBandwidth;
+      } else if (test.id === 'ai_quantization') {
+        aiBenchmarkResults.quantizationPerformance = details as typeof aiBenchmarkResults.quantizationPerformance;
+      } else if (test.id === 'ai_thermal') {
+        aiBenchmarkResults.thermalThrottling = details as typeof aiBenchmarkResults.thermalThrottling;
+      }
 
       // Small delay to show progress
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -79,8 +490,9 @@ export class DeviceBenchmarkService {
     onProgress?.(100, 'Computing results');
 
     const averageScore = totalScore / completedTests;
+    const aiCapabilityScore = this.calculateAICapabilityScore(aiBenchmarkResults, aiAccelerator);
     const performanceTier = this.calculatePerformanceTier(averageScore, deviceInfo);
-    const recommendedModels = await this.generateModelRecommendations(performanceTier, averageScore);
+    const recommendedModels = await this.generateAIModelRecommendations(performanceTier, averageScore, aiCapabilityScore, aiAccelerator);
 
     const benchmark: DeviceBenchmark = {
       deviceId: await DeviceInfo.getUniqueId(),
@@ -94,7 +506,10 @@ export class DeviceBenchmarkService {
       storageAvailable: deviceInfo.storageAvailable,
       hasGpu: deviceInfo.hasGpu,
       gpuName: deviceInfo.gpuName,
+      aiAccelerator,
+      aiBenchmarkResults,
       benchmarkScore: Math.round(averageScore),
+      aiCapabilityScore: Math.round(aiCapabilityScore),
       performanceTier,
       recommendedModels,
       benchmarkedAt: new Date().toISOString(),
@@ -141,13 +556,13 @@ export class DeviceBenchmarkService {
     return Math.round((iterations * 10) / Math.max(duration, 1));
   }
 
-  private async performCpuWork(iterations: number): Promise<void> {
+  private async performCpuWork(iterations: number): Promise<number> {
     return new Promise(resolve => {
       let sum = 0;
       for (let i = 0; i < iterations; i++) {
         sum += Math.sqrt(i) * Math.sin(i) * Math.cos(i);
       }
-      resolve();
+      resolve(sum);
     });
   }
 
@@ -272,25 +687,180 @@ export class DeviceBenchmarkService {
     return 'low';
   }
 
+  private calculateAICapabilityScore(aiBenchmarkResults: AIBenchmarkResults, aiAccelerator: AIAccelerator): number {
+    if (!aiBenchmarkResults) return 50; // Default score if no AI benchmarks
+
+    // Weighted scoring for AI capabilities
+    const matrixWeight = 0.35;
+    const memoryWeight = 0.25;
+    const quantWeight = 0.25;
+    const thermalWeight = 0.15;
+
+    // Normalize matrix performance (typical ranges: 100-5000 ops/sec)
+    const matrixScore = Math.min(
+      (aiBenchmarkResults.matrixMultiplication.ops16x16 + 
+       aiBenchmarkResults.matrixMultiplication.ops32x32 + 
+       aiBenchmarkResults.matrixMultiplication.ops64x64) / 3 / 50, 100
+    );
+
+    // Normalize memory performance (typical ranges: 100-2000 MB/s)
+    const memoryScore = Math.min(
+      (aiBenchmarkResults.memoryBandwidth.sequentialRead + 
+       aiBenchmarkResults.memoryBandwidth.sequentialWrite + 
+       aiBenchmarkResults.memoryBandwidth.randomAccess) / 3 / 20, 100
+    );
+
+    // Score quantization support
+    const quantSupported = [
+      aiBenchmarkResults.quantizationPerformance.fp16.supported,
+      aiBenchmarkResults.quantizationPerformance.int8.supported,
+      aiBenchmarkResults.quantizationPerformance.int4.supported,
+      aiBenchmarkResults.quantizationPerformance.w4a8.supported,
+    ].filter(Boolean).length;
+    const quantScore = (quantSupported / 4) * 100;
+
+    // Thermal performance score
+    const thermalScore = aiBenchmarkResults.thermalThrottling.sustainedPerformance;
+
+    // Accelerator bonus
+    let acceleratorBonus = 0;
+    if (aiAccelerator.type === 'npu') {
+      acceleratorBonus = 20;
+    } else if (aiAccelerator.type === 'gpu') {
+      acceleratorBonus = 10;
+    }
+
+    const finalScore = (
+      matrixScore * matrixWeight +
+      memoryScore * memoryWeight +
+      quantScore * quantWeight +
+      thermalScore * thermalWeight
+    ) + acceleratorBonus;
+
+    return Math.min(finalScore, 100);
+  }
+
+  private async generateAIModelRecommendations(
+    tier: PerformanceTier, 
+    score: number, 
+    aiScore: number, 
+    aiAccelerator: AIAccelerator
+  ): Promise<ModelRecommendation[]> {
+    const recommendations: ModelRecommendation[] = [];
+
+    // Light tier models (suitable for all devices)
+    const lightModels = [
+      {
+        modelId: 'google/gemma-3-270m',
+        modelName: 'Gemma 3 270M',
+        parameters: '270M',
+        tier: 'light' as ModelTier,
+        recommendedQuantization: 'int8' as PrecisionType,
+        estimatedPerformance: {
+          tokensPerSecond: Math.round(aiScore / 10),
+          memoryUsage: 512,
+          batteryImpact: 'minimal' as const,
+        },
+        compatibilityScore: Math.min(100, aiScore + 20),
+        useCases: ['Quick chat', 'Simple Q&A', 'Basic assistance'],
+      },
+      {
+        modelId: 'microsoft/phi-4-mini',
+        modelName: 'Phi-4 Mini',
+        parameters: '3.8B',
+        tier: 'light' as ModelTier,
+        recommendedQuantization: aiAccelerator.supportsInt4 ? 'int4' as PrecisionType : 'int8' as PrecisionType,
+        estimatedPerformance: {
+          tokensPerSecond: Math.round(aiScore / 15),
+          memoryUsage: 1024,
+          batteryImpact: 'low' as const,
+        },
+        compatibilityScore: Math.min(100, aiScore + 10),
+        useCases: ['Reasoning', 'Math problems', 'Code assistance'],
+      },
+    ];
+
+    // Medium tier models (for medium+ devices)
+    const mediumModels = [
+      {
+        modelId: 'google/gemma-3n-4b',
+        modelName: 'Gemma 3n 4B',
+        parameters: '4B',
+        tier: 'medium' as ModelTier,
+        recommendedQuantization: aiAccelerator.supportsInt4 ? 'int4' as PrecisionType : 'int8' as PrecisionType,
+        estimatedPerformance: {
+          tokensPerSecond: Math.round(aiScore / 20),
+          memoryUsage: 2048,
+          batteryImpact: 'moderate' as const,
+        },
+        compatibilityScore: Math.max(0, aiScore - 10),
+        useCases: ['Advanced chat', 'Content creation', 'Complex reasoning'],
+      },
+      {
+        modelId: 'qwen/qwen3-7b',
+        modelName: 'Qwen3 7B',
+        parameters: '7B',
+        tier: 'medium' as ModelTier,
+        recommendedQuantization: aiAccelerator.supportsInt4 ? 'int4' as PrecisionType : 'int8' as PrecisionType,
+        estimatedPerformance: {
+          tokensPerSecond: Math.round(aiScore / 25),
+          memoryUsage: 3584,
+          batteryImpact: 'moderate' as const,
+        },
+        compatibilityScore: Math.max(0, aiScore - 15),
+        useCases: ['Professional writing', 'Code generation', 'Analysis'],
+      },
+    ];
+
+    // Heavy tier models (for high-end devices only)
+    const heavyModels = [
+      {
+        modelId: 'google/gemma-3n-8b',
+        modelName: 'Gemma 3n 8B',
+        parameters: '8B',
+        tier: 'heavy' as ModelTier,
+        recommendedQuantization: aiAccelerator.supportsInt4 ? 'int4' as PrecisionType : 'int8' as PrecisionType,
+        estimatedPerformance: {
+          tokensPerSecond: Math.round(aiScore / 30),
+          memoryUsage: 4096,
+          batteryImpact: 'high' as const,
+        },
+        compatibilityScore: Math.max(0, aiScore - 25),
+        useCases: ['Expert-level tasks', 'Complex code', 'Research assistance'],
+      },
+    ];
+
+    // Add models based on device capability
+    recommendations.push(...lightModels);
+
+    if (tier === 'medium' || tier === 'high') {
+      recommendations.push(...mediumModels);
+    }
+
+    if (tier === 'high' && aiScore > 70) {
+      recommendations.push(...heavyModels);
+    }
+
+    // Filter out models with very low compatibility scores
+    return recommendations.filter(model => model.compatibilityScore > 30);
+  }
+
   private async generateModelRecommendations(tier: PerformanceTier, score: number): Promise<string[]> {
     const recommendations: Record<PerformanceTier, string[]> = {
       'low': [
-        'distilbert-base-uncased',
-        'microsoft/DialoGPT-small',
-        'Helsinki-NLP/opus-mt-en-de',
+        'google/gemma-3-270m',
+        'microsoft/phi-4-mini',
       ],
       'medium': [
-        'microsoft/DialoGPT-medium',
-        'facebook/blenderbot-400M-distill',
-        'microsoft/CodeBERT-base',
-        'EleutherAI/gpt-neo-125M',
+        'google/gemma-3n-4b',
+        'qwen/qwen3-7b',
+        'microsoft/phi-4-mini',
       ],
       'high': [
-        'EleutherAI/gpt-neo-1.3B',
-        'microsoft/DialoGPT-large',
-        'facebook/blenderbot-1B-distill',
-        'codeparrot/codeparrot-small',
-        'microsoft/BioGPT',
+        'google/gemma-3n-8b',
+        'google/gemma-3n-4b',
+        'qwen/qwen3-7b',
+        'microsoft/phi-4-mini',
       ],
     };
 

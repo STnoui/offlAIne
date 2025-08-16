@@ -4,7 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useTheme } from 'react-native-paper';
 import { Text } from 'react-native';
-import { DiscoverScreen } from '../screens/DiscoverScreen-Simple';
+import { DiscoverScreen } from '../screens/DiscoverScreen';
 import { LibraryScreen } from '../screens/LibraryScreen';
 import { BenchmarkScreen } from '../screens/BenchmarkScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';

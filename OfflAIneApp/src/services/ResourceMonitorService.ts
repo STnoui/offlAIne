@@ -35,7 +35,7 @@ interface PerformanceMetrics {
 
 export class ResourceMonitorService {
   private static instance: ResourceMonitorService;
-  private monitoringInterval: NodeJS.Timeout | null = null;
+  private monitoringInterval: ReturnType<typeof setInterval> | null = null;
   private currentSession: MonitoringSession | null = null;
   private resourceHistory: ResourceUsage[] = [];
   private listeners: ((usage: ResourceUsage) => void)[] = [];
@@ -136,6 +136,7 @@ export class ResourceMonitorService {
         timestamp: Date.now(),
         cpuUsage,
         memoryUsage,
+        totalMemory: totalMemoryMB,
         batteryLevel: batteryLevel * 100, // Convert to percentage
         batteryDrain,
         temperature,
@@ -150,6 +151,7 @@ export class ResourceMonitorService {
         timestamp: Date.now(),
         cpuUsage: 0,
         memoryUsage: 0,
+        totalMemory: 4000, // Default 4GB
         batteryLevel: 100,
         batteryDrain: 0,
         modelId: this.currentSession?.modelId,
